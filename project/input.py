@@ -1,6 +1,0 @@
-print('How old are you? (in years):', end=' ')
-age = input()
-print(f'So you are {age} years old?' )
-question = input()
-print(f'Ok, thanks for answering the question with "{question}".')
-help(input)
