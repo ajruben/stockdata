@@ -7,6 +7,7 @@ from scipy import stats
 from pandas_datareader import data as pdr
 import functools 
 yf.pdr_override()
+import matplotlib.pyplot as plt
 
 class Stock():
     def __init__(self, add):
@@ -35,7 +36,7 @@ class Stock():
             raise ValueError('self.data is None. First run self.get_data().')
 
     #@functools.cached_property
-    def calculate_betas(self, company, index): #usually company index, but can alos be company company, index index, index company.
+    def calculate_betas(self, company, index, plot=False): #usually company index, but can alos be company company, index index, index company.
         #select data into np array to prep for calculations
         if self.log is None:
             raise ValueError('self.log is None. First run self.get_data() and get_return().')
@@ -51,13 +52,32 @@ class Stock():
         vol_period = vol_daily*np.sqrt(len(npa_log_index))
         #store
         self.overview = {'beta1' : beta1, 'beta0' : beta0, 'r_sq' : r_sq, 'vol_daily' : vol_daily, 'vol_period': vol_period}
-        
+        if plot:
+            self.plot_betas(ret_company= npa_log_company, ret_index= npa_log_index)
 
+    def plot_betas(self, ret_company, ret_index ):
+        import matplotlib.pyplot as plt     
+        # Create a scatterplot
+        plt.scatter(ret_index, ret_company, label='Scatterplot', color='blue', marker='o')
+
+        # Create a line plot
+        x_line = np.linspace(-0.05,0.061, num=100000)
+        y_line = self.overview['beta0'] + (self.overview['beta1'] * x_line)  
+        plt.plot(x_line, y_line, label='Line Plot', color='red', linestyle='--')
+
+        # Add labels and legend
+        plt.xlabel('X-axis')
+        plt.ylabel('Y-axis')
+        plt.title('Scatterplot and Line Plot')
+        plt.legend()
+
+        # Save the figure in a recommended format (e.g., PNG)
+        plt.savefig('scatterplot_and_line_plot.png')
 
 
 if __name__ == '__main__':
     stock = Stock(add=[])
     stock.get_data()
     stock.get_return()
-    stock.calculate_betas('AAPL', '^GSPC')
-    print(stock.overview)
+    stock.calculate_betas('AAPL', '^GSPC', plot=True)
+    #print(stock.overview)
