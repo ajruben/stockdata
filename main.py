@@ -95,6 +95,7 @@ class Stock():
         plt.xlabel(f'{lineair_regression_result['index']}-axis')
         plt.ylabel(f'{lineair_regression_result['company']}-axis')
         plt.title(f'Linear regression for {type_return}: {lineair_regression_result['company']} and {lineair_regression_result['index']} between {str(self.start)[:10]} and {str(self.end)[:10]}')
+        plt.grid()
         plt.legend()
 
         # Save and close
