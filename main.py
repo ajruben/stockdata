@@ -8,6 +8,7 @@ from pandas_datareader import data as pdr
 import functools 
 yf.pdr_override()
 import matplotlib.pyplot as plt
+import os 
 
 class Stock():
     def __init__(self, add):
@@ -20,6 +21,7 @@ class Stock():
         self.nreturn = None
         self.n2return = None
         self.overview = None
+        self.figures_directory = 'figures'
 
     #@functools.cached_property
     def get_data(self):
@@ -36,48 +38,72 @@ class Stock():
             raise ValueError('self.data is None. First run self.get_data().')
 
     #@functools.cached_property
-    def calculate_betas(self, company, index, plot=False): #usually company index, but can alos be company company, index index, index company.
-        #select data into np array to prep for calculations
+    def linear_regression(self, company_name, index_name, plot=False): #usually company index, but can alos be company company, index index, index company.
+        """
+        background: https://www.probabilitycourse.com/chapter8/8_5_2_first_method_for_finding_beta.php
+        """
+        
         if self.log is None:
             raise ValueError('self.log is None. First run self.get_data() and get_return().')
         
-        npa_log_company = self.log.loc[:,company].values
-        npa_log_index = self.log.loc[:,index].values
-        #execute
-        cov = np.cov(npa_log_index, npa_log_company)
-        beta1 = cov[1,0]/cov[0,0]
-        beta0 =  npa_log_company.mean() - beta1*npa_log_index.mean()
-        r_sq = (cov[1,0])**2 /(cov[0,0]*cov[1,1])
-        vol_daily = npa_log_index.std()
-        vol_period = vol_daily*np.sqrt(len(npa_log_index))
-        #store
-        self.overview = {'beta1' : beta1, 'beta0' : beta0, 'r_sq' : r_sq, 'vol_daily' : vol_daily, 'vol_period': vol_period}
+        lin_dict = {}
+        for key, return_data in zip(["log return", "normal return", "double derivative return"],[self.log, self.nreturn, self.n2return]):
+            #prep data
+            company = return_data.loc[:, company_name].values
+            index = return_data.loc[:, index_name].values
+            #all calculations
+            cov = np.cov(index, company)
+            beta1 = cov[1,0]/cov[0,0]
+            beta0 =  company.mean() - beta1*index.mean()
+            r_sq = (cov[1,0])**2 /(cov[0,0]*cov[1,1])
+            vol_daily = index.std()
+            vol_period = vol_daily*np.sqrt(len(index))
+            #store results
+            linear_regression = {'covmat':cov, 'beta1' : beta1, 'beta0' : beta0, 'r_sq' : r_sq, 'vol_daily' : vol_daily, 'vol_period': vol_period, 
+                                 'company':company_name, 'index':index_name, 'company_returns':company, 'index_returns':index}
+            lin_dict[key] = linear_regression
+        self.linear_regression = lin_dict
+        
         if plot:
-            self.plot_betas(ret_company= npa_log_company, ret_index= npa_log_index)
+            #check output directory figures.
+            if not os.path.exists(self.figures_directory):
+                os.makedirs(self.figures_directory)
+            for key in self.linear_regression:
+                self._plot_regression(self.linear_regression[key], type_return = key)
 
-    def plot_betas(self, ret_company, ret_index ):
-        import matplotlib.pyplot as plt     
-        # Create a scatterplot
-        plt.scatter(ret_index, ret_company, label='Scatterplot', color='blue', marker='o')
+    def _plot_regression(self, lineair_regression_result, type_return):
+        #data
+        ret_index = lineair_regression_result['index_returns']
+        ret_company = lineair_regression_result['company_returns']
+        
+        #init figure, create scatter
+        plt.figure()
+        plt.scatter(ret_index, ret_company, label='return on a given day', color='blue', marker='.')
 
-        # Create a line plot
-        x_line = np.linspace(-0.05,0.061, num=100000)
-        y_line = self.overview['beta0'] + (self.overview['beta1'] * x_line)  
-        plt.plot(x_line, y_line, label='Line Plot', color='red', linestyle='--')
-
-        # Add labels and legend
-        plt.xlabel('X-axis')
-        plt.ylabel('Y-axis')
-        plt.title('Scatterplot and Line Plot')
+        #borders and regression line
+        x_min = (ret_index.min()) - (ret_index.max()*0.2)
+        x_max = (ret_index.max()) * 1.2
+        y_min = (ret_company.min()) - (ret_company.max()*0.2)
+        y_max = (ret_company.max()) * 1.2
+        x_line = np.linspace(x_min-1, x_max+1, num=2)
+        y_line = lineair_regression_result['beta0'] + (lineair_regression_result['beta1'] * x_line)  
+        plt.plot(x_line, y_line, label='Linear regression', color='red')
+        
+        # layout
+        plt.xlim(x_min, x_max)
+        plt.ylim(y_min, y_max)
+        plt.xlabel(f'{lineair_regression_result['index']}-axis')
+        plt.ylabel(f'{lineair_regression_result['company']}-axis')
+        plt.title(f'Linear regression for {type_return}: {lineair_regression_result['company']} and {lineair_regression_result['index']} between {str(self.start)[:10]} and {str(self.end)[:10]}')
         plt.legend()
 
-        # Save the figure in a recommended format (e.g., PNG)
-        plt.savefig('scatterplot_and_line_plot.png')
-
+        # Save and close
+        plt.savefig(f'{self.figures_directory}/linear_regression_{type_return}_{lineair_regression_result['company']}_{lineair_regression_result['index']}_{str(self.start)[:10]}_{str(self.end)[:10]}.png')
+        plt.close()
 
 if __name__ == '__main__':
     stock = Stock(add=[])
     stock.get_data()
     stock.get_return()
-    stock.calculate_betas('AAPL', '^GSPC', plot=True)
+    stock.linear_regression('AAPL', '^GSPC', plot=True)
     #print(stock.overview)
